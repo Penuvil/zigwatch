@@ -2,22 +2,37 @@ const std = @import("std");
 
 const WatchHandle = @import("Watcher.zig").WatchHandle;
 
-pub const EventType = enum {
-    create,
-    modify,
-    delete,
+pub const EventMask = enum(u32) {
+    Create = 1 << 0,
+    Modify = 1 << 1,
+    Delete = 1 << 2,
 };
 
-pub const EventMask = u32;
+pub const EventFilterMask = struct {
+    create: bool = true,
+    modify: bool = true,
+    delete: bool = true,
 
-pub const EventMaskAll = EventMask(0xffffff);
-pub const EventMaskCreate = EventMask(1 << 0);
-pub const EventMaskModify = EventMask(1 << 1);
-pub const EventMaskDelete = EventMask(1 << 2);
+    pub fn fromBits(bits: EventMask) EventFilterMask {
+        return EventFilterMask{
+            .create = bits == EventMask.Create,
+            .modify = bits == EventMask.Modify,
+            .delete = bits == EventMask.Delete,
+        };
+    }
+
+    pub fn toBits(self: EventFilterMask) u32 {
+        var result: u32 = 0;
+        if (self.create) result |= @intFromEnum(EventMask.Create);
+        if (self.modify) result |= @intFromEnum(EventMask.Modify);
+        if (self.delete) result |= @intFromEnum(EventMask.Delete);
+        return result;
+    }
+};
 
 pub const Event = struct {
     handle: WatchHandle,
-    type: EventType,
+    type: EventMask,
     path: []const u8,
     timestamp: i64,
     extra: ?EventExtra,

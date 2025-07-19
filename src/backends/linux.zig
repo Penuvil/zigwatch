@@ -1,20 +1,22 @@
 const std = @import("std");
 
-const EventMask = @import("../Event.zig").EventMask;
+const EventFilterMask = @import("../Event.zig").EventFilterMask;
 const WatchHandle = @import("../Watcher.zig").WatchHandle;
 const inotify = @cImport({
     @cInclude("sys/inotify.h");
 });
 
 pub const LinuxWatcher = struct {
-    pub fn init() c_int {
+    pub fn init() WatchHandle {
         const fd = inotify.inotify_init();
-        std.debug.print("Hello, you are being watched {d}", .{fd});
-        return fd;
+        // TODO: Return error on failed init
+        return @intCast(fd);
     }
 
-    pub fn add_watch(fd: WatchHandle, pathname: []const u8, mask: EventMask) c_int {
-        inotify.inotify_add_watch(fd, pathname, mask);
+    pub fn add_watch(fd: WatchHandle, pathname: [:0]const u8, mask: EventFilterMask) WatchHandle {
+        const wd = inotify.inotify_add_watch(@intCast(fd), pathname, mask.toBits());
+        // TODO: Return error on failure
+        return @intCast(wd);
     }
 };
 
