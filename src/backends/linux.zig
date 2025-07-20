@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const EventFilterMask = @import("../Event.zig").EventFilterMask;
+const EventFilter = @import("../Event.zig").EventFilter;
 const WatchHandle = @import("../Watcher.zig").WatchHandle;
 const inotify = @cImport({
     @cInclude("sys/inotify.h");
@@ -13,7 +13,7 @@ pub const LinuxWatcher = struct {
         return @intCast(fd);
     }
 
-    pub fn add_watch(fd: WatchHandle, pathname: [:0]const u8, mask: EventFilterMask) WatchHandle {
+    pub fn add_watch(fd: WatchHandle, pathname: [:0]const u8, mask: EventFilter) WatchHandle {
         const wd = inotify.inotify_add_watch(@intCast(fd), pathname, mask.toBits());
         // TODO: Return error on failure
         return @intCast(wd);

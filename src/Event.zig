@@ -2,30 +2,37 @@ const std = @import("std");
 
 const WatchHandle = @import("Watcher.zig").WatchHandle;
 
-pub const EventMask = enum(u32) {
-    Create = 1 << 0,
-    Modify = 1 << 1,
-    Delete = 1 << 2,
+pub const EventType = enum {
+    Create,
+    Modify,
+    Delete,
 };
 
-pub const EventFilterMask = struct {
+pub const EventMask = u32;
+
+pub const EventMaskCreate = 1 << 0;
+pub const EventMaskModify = 1 << 1;
+pub const EventMaskDelete = 1 << 2;
+pub const EventMaskAll = 0xFFFFFFFF;
+
+pub const EventFilter = struct {
     create: bool = true,
     modify: bool = true,
     delete: bool = true,
 
-    pub fn fromBits(bits: EventMask) EventFilterMask {
-        return EventFilterMask{
-            .create = bits == EventMask.Create,
-            .modify = bits == EventMask.Modify,
-            .delete = bits == EventMask.Delete,
+    pub fn fromBits(bits: EventMask) EventFilter {
+        return EventFilter{
+            .create = (bits & EventMaskCreate) != 0,
+            .modify = (bits & EventMaskModify) != 0,
+            .delete = (bits & EventMaskDelete) != 0,
         };
     }
 
-    pub fn toBits(self: EventFilterMask) u32 {
+    pub fn toBits(self: EventFilter) u32 {
         var result: u32 = 0;
-        if (self.create) result |= @intFromEnum(EventMask.Create);
-        if (self.modify) result |= @intFromEnum(EventMask.Modify);
-        if (self.delete) result |= @intFromEnum(EventMask.Delete);
+        if (self.create) result |= EventMaskCreate;
+        if (self.modify) result |= EventMaskModify;
+        if (self.delete) result |= EventMaskDelete;
         return result;
     }
 };

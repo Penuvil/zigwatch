@@ -6,6 +6,6 @@ pub fn main() void {
     // TODO: Add error handling
     defer _ = std.posix.close(@intCast(fd));
 
-    _ = zw.Watcher.add_watch(fd, ".", zw.EventFilterMask.fromBits(.Modify));
+    _ = zw.Watcher.add_watch(fd, ".", zw.EventFilter.fromBits(zw.EventMaskModify));
     // TODO: Expand example as API matures
 }
