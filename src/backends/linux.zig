@@ -1,24 +1,12 @@
 const std = @import("std");
 
 const EventFilter = @import("../Event.zig").EventFilter;
+const EventType = @import("../Event.zig").EventType;
 const WatchHandle = @import("../Watcher.zig").WatchHandle;
+const WatchPath = @import("../Watcher.zig").WatchPath;
 const inotify = @cImport({
     @cInclude("sys/inotify.h");
 });
-
-pub const LinuxWatcher = struct {
-    pub fn init() WatchHandle {
-        const fd = inotify.inotify_init();
-        // TODO: Return error on failed init
-        return @intCast(fd);
-    }
-
-    pub fn add_watch(fd: WatchHandle, pathname: [:0]const u8, mask: EventFilter) WatchHandle {
-        const wd = inotify.inotify_add_watch(@intCast(fd), pathname, mask.toBits());
-        // TODO: Return error on failure
-        return @intCast(wd);
-    }
-};
 
 const IN_ACCESS = inotify.IN_ACCESS;
 const IN_ATTRIB = inotify.IN_ATTRIB;
@@ -34,3 +22,23 @@ const IN_MOVED_FROM = inotify.IN_MOVED_FROM;
 const IN_MOVED_TO = inotify.IN_MOVED_TO;
 const IN_MOVE = inotify.IN_MOVE;
 const IN_OPEN = inotify.IN_OPEN;
+
+pub const mapInotify = [_]struct { mask: u32, event: EventType }{
+    .{ .mask = IN_CREATE, .event = .Create },
+    .{ .mask = IN_MODIFY, .event = .Modify },
+    .{ .mask = IN_DELETE, .event = .Delete },
+};
+
+pub const LinuxWatcher = struct {
+    pub fn init() WatchHandle {
+        const fd = inotify.inotify_init();
+        // TODO: Return error on failed init
+        return @intCast(fd);
+    }
+
+    pub fn add_watch(fd: WatchHandle, target: WatchPath, mask: EventFilter) WatchHandle {
+        const wd = inotify.inotify_add_watch(@intCast(fd), target.path().ptr, mask.toBits());
+        // TODO: Return error on failure
+        return @intCast(wd);
+    }
+};
