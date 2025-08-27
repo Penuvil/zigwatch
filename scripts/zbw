@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec watchexec --exts zig,toml -r -- zig build
