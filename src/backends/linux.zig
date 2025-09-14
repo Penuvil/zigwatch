@@ -32,13 +32,20 @@ pub const mapInotify = [_]struct { mask: u32, event: EventType }{
 pub const LinuxWatcher = struct {
     pub fn init() WatchHandle {
         const fd = inotify.inotify_init();
-        // TODO: Return error on failed init
+        if (fd == -1) {
+            _ = std.posix.errno(fd);
+            // TODO: Return error on failure
+        }
         return @intCast(fd);
     }
 
     pub fn add_watch(fd: WatchHandle, target: WatchPath, mask: EventFilter) WatchHandle {
         const wd = inotify.inotify_add_watch(@intCast(fd), target.path().ptr, mask.toBits());
-        // TODO: Return error on failure
+        std.log.debug("{s}\n", .{target.path()});
+        if (wd == -1) {
+            _ = std.posix.errno(wd);
+            // TODO: Return error on failure
+        }
         return @intCast(wd);
     }
 };

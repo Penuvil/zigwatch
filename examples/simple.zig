@@ -10,7 +10,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var target = try zw.WatchPath.init(".", allocator);
+    var target = try zw.WatchPath.init("/home/", allocator);
     defer _ = target.deinit(allocator);
     const wd = zw.Watcher.add_watch(fd, target, .{ .modify = true });
     std.log.info("Watch added: {}", .{wd});
