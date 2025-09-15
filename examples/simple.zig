@@ -2,7 +2,7 @@ const std = @import("std");
 const zw = @import("zigwatch");
 
 pub fn main() !void {
-    const fd = zw.Watcher.init();
+    const fd = try zw.Watcher.init();
     // TODO: Add error handling
     std.log.info("Watcher created: {}", .{fd});
     defer _ = std.posix.close(@intCast(fd));
@@ -10,9 +10,9 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var target = try zw.WatchPath.init("/home/", allocator);
+    var target = try zw.WatchPath.init(".", allocator);
     defer _ = target.deinit(allocator);
-    const wd = zw.Watcher.add_watch(fd, target, .{ .modify = true });
+    const wd = try zw.Watcher.add_watch(fd, target, .{ .modify = true });
     std.log.info("Watch added: {}", .{wd});
     // TODO: Expand example as API matures
 }
