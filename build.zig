@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
         .name = "zigwatch",
         .root_module = zigwatchMod,
     });
@@ -18,12 +18,11 @@ pub fn build(b: *std.Build) void {
     lib.linkLibC();
     b.installArtifact(lib);
 
-    const example = b.addExecutable(.{
-        .name = "simple_example",
+    const example = b.addExecutable(.{ .name = "simple_example", .root_module = b.createModule(.{
         .root_source_file = .{ .cwd_relative = "examples/simple.zig" },
         .target = target,
         .optimize = optimize,
-    });
+    }) });
 
     example.linkLibrary(lib);
     example.root_module.addImport("zigwatch", zigwatchMod);

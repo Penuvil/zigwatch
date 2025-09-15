@@ -8,6 +8,8 @@ const inotify = @cImport({
     @cInclude("sys/inotify.h");
 });
 
+const FsEventError = @import("../Error.zig").FsEventError;
+
 const IN_ACCESS = inotify.IN_ACCESS;
 const IN_ATTRIB = inotify.IN_ATTRIB;
 const IN_CLOSE_WRITE = inotify.IN_CLOSE_WRITE;
@@ -29,16 +31,37 @@ pub const mapInotify = [_]struct { mask: u32, event: EventType }{
     .{ .mask = IN_DELETE, .event = .Delete },
 };
 
+const mapFsEventError = [_]struct { posix: std.posix.E, err: FsEventError }{
+    .{ .posix = .NOENT, .err = FsEventError.FileNotFound },
+    .{ .posix = .PERM, .err = FsEventError.PermissionDenied },
+    .{ .posix = .NOMEM, .err = FsEventError.OutOfMemory },
+    .{ .posix = .INVAL, .err = FsEventError.InvalidArguments },
+    .{ .posix = .MFILE, .err = FsEventError.TooManyOpenFiles },
+    .{ .posix = .NFILE, .err = FsEventError.TooManyOpenFiles },
+    .{ .posix = .NAMETOOLONG, .err = FsEventError.NameTooLong },
+};
+
+fn errnoToFsEventError(err: std.posix.E) FsEventError {
+    inline for (mapFsEventError) |entry| {
+        if (err == entry.posix) return entry.err;
+    }
+    return FsEventError.Unexpected;
+}
+
 pub const LinuxWatcher = struct {
-    pub fn init() WatchHandle {
+    pub fn init() !WatchHandle {
         const fd = inotify.inotify_init();
-        // TODO: Return error on failed init
+        if (fd == -1) {
+            return errnoToFsEventError(std.posix.errno(fd));
+        }
         return @intCast(fd);
     }
 
-    pub fn add_watch(fd: WatchHandle, target: WatchPath, mask: EventFilter) WatchHandle {
-        const wd = inotify.inotify_add_watch(@intCast(fd), target.path().ptr, mask.toBits());
-        // TODO: Return error on failure
+    pub fn add_watch(fd: WatchHandle, target: WatchPath, mask: EventFilter) !WatchHandle {
+        const wd = inotify.inotify_add_watch(@intCast(fd), target.cstr(), mask.toBits());
+        if (wd == -1) {
+            return errnoToFsEventError(std.posix.errno(wd));
+        }
         return @intCast(wd);
     }
 };
