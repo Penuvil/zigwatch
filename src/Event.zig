@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 const WatchHandle = @import("Watcher.zig").WatchHandle;
 
 pub const mapPlatform = switch (builtin.os.tag) {
-    .linux => @import("backends/linux.zig").mapInotify,
+    .linux => @import("backends/linux.zig").mapInotifyEvent,
     else => @compileError("Unsupported OS"),
 };
 
@@ -15,9 +15,9 @@ pub const EventType = enum {
 };
 
 pub const EventFilter = struct {
-    create: bool = true,
-    modify: bool = true,
-    delete: bool = true,
+    create: bool = false,
+    modify: bool = false,
+    delete: bool = false,
 
     pub fn toBits(self: EventFilter) u32 {
         var mask: u32 = 0;
@@ -29,6 +29,7 @@ pub const EventFilter = struct {
             };
             if (include) mask |= map.mask;
         }
+        std.log.debug("{}", .{mask});
         return mask;
     }
 };

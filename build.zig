@@ -8,6 +8,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .cwd_relative = "src/root.zig" },
         .target = target,
         .optimize = optimize,
+        .link_libc = false,
     });
 
     const lib = b.addLibrary(.{
@@ -15,7 +16,6 @@ pub fn build(b: *std.Build) void {
         .root_module = zigwatchMod,
     });
 
-    lib.linkLibC();
     b.installArtifact(lib);
 
     const example = b.addExecutable(.{ .name = "simple_example", .root_module = b.createModule(.{

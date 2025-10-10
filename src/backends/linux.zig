@@ -1,35 +1,27 @@
 const std = @import("std");
+const linux = std.os.linux;
+const IN = linux.IN;
 
 const EventFilter = @import("../Event.zig").EventFilter;
 const EventType = @import("../Event.zig").EventType;
+const Event = @import("../Event.zig").Event;
 const WatchHandle = @import("../Watcher.zig").WatchHandle;
 const WatchPath = @import("../Watcher.zig").WatchPath;
-const inotify = @cImport({
-    @cInclude("sys/inotify.h");
-});
 
 const FsEventError = @import("../Error.zig").FsEventError;
 
-const IN_ACCESS = inotify.IN_ACCESS;
-const IN_ATTRIB = inotify.IN_ATTRIB;
-const IN_CLOSE_WRITE = inotify.IN_CLOSE_WRITE;
-const IN_CLOSE_NOWRITE = inotify.IN_CLOSE_NOWRITE;
-const IN_CLOSE = inotify.IN_CLOSE;
-const IN_CREATE = inotify.IN_CREATE;
-const IN_DELETE = inotify.IN_DELETE;
-const IN_DELETE_SELF = inotify.IN_DELETE_SELF;
-const IN_MODIFY = inotify.IN_MODIFY;
-const IN_MOVE_SELF = inotify.IN_MOVE_SELF;
-const IN_MOVED_FROM = inotify.IN_MOVED_FROM;
-const IN_MOVED_TO = inotify.IN_MOVED_TO;
-const IN_MOVE = inotify.IN_MOVE;
-const IN_OPEN = inotify.IN_OPEN;
-
-pub const mapInotify = [_]struct { mask: u32, event: EventType }{
-    .{ .mask = IN_CREATE, .event = .Create },
-    .{ .mask = IN_MODIFY, .event = .Modify },
-    .{ .mask = IN_DELETE, .event = .Delete },
+pub const mapInotifyEvent = [_]struct { mask: u32, event: EventType }{
+    .{ .mask = IN.CREATE, .event = .Create },
+    .{ .mask = IN.MODIFY, .event = .Modify },
+    .{ .mask = IN.DELETE, .event = .Delete },
 };
+
+fn inotifyEventToEvent(mask: u32) !EventType {
+    inline for (mapInotifyEvent) |entry| {
+        if (mask == entry.mask) return entry.event;
+    }
+    return FsEventError.Unexpected;
+}
 
 const mapFsEventError = [_]struct { posix: std.posix.E, err: FsEventError }{
     .{ .posix = .NOENT, .err = FsEventError.FileNotFound },
@@ -49,19 +41,89 @@ fn errnoToFsEventError(err: std.posix.E) FsEventError {
 }
 
 pub const LinuxWatcher = struct {
-    pub fn init() !WatchHandle {
-        const fd = inotify.inotify_init();
+    const Self = @This();
+    wfd: WatchHandle,
+    poller: LinuxPoller,
+
+    pub fn init() !Self {
+        const fd = linux.inotify_init1(IN.NONBLOCK | IN.CLOEXEC);
         if (fd == -1) {
             return errnoToFsEventError(std.posix.errno(fd));
         }
-        return @intCast(fd);
+        const poller = try LinuxPoller.init();
+        _ = try poller.add(@intCast(fd));
+        return Self{
+            .wfd = @intCast(fd),
+            .poller = poller,
+        };
     }
 
-    pub fn add_watch(fd: WatchHandle, target: WatchPath, mask: EventFilter) !WatchHandle {
-        const wd = inotify.inotify_add_watch(@intCast(fd), target.cstr(), mask.toBits());
+    pub fn add_watch(self: *const Self, target: WatchPath, mask: EventFilter) !WatchHandle {
+        const wd = linux.inotify_add_watch(@intCast(self.wfd), target.cstr(), mask.toBits());
         if (wd == -1) {
             return errnoToFsEventError(std.posix.errno(wd));
         }
         return @intCast(wd);
+    }
+
+    pub fn poll(self: *const Self) !usize {
+        var buf: [20]linux.epoll_event = undefined;
+        const count = try self.poller.wait(&buf, 0);
+        std.log.debug("{}", .{count});
+        for (buf[0..count]) |event| {
+            if (event.data.fd == self.wfd) {
+                var offset: usize = 0;
+                var evbuf: [4096]u8 = undefined;
+                const size = linux.read(@intCast(self.wfd), &evbuf, evbuf.len);
+                while (offset < size) {
+                    const e: *align(1) linux.inotify_event = @ptrCast(&evbuf[offset]);
+                    const result: Event = .{
+                        .handle = e.wd,
+                        .type = try inotifyEventToEvent(e.mask),
+                        .path = "",
+                        .timestamp = 0,
+                        .extra = null,
+                    };
+                    std.log.debug("{any}", .{result});
+                    offset += @sizeOf(linux.inotify_event) + e.len;
+                }
+            }
+        }
+        return count;
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.poller.deinit();
+        _ = linux.close(@intCast(self.wfd));
+    }
+};
+
+pub const LinuxPoller = struct {
+    const Self = @This();
+    epfd: usize,
+
+    pub fn init() !Self {
+        const fd = linux.epoll_create1(linux.EPOLL.CLOEXEC);
+        if (fd < 0) return errnoToFsEventError(fd);
+        return Self{ .epfd = fd };
+    }
+
+    pub fn add(self: *const Self, fd: WatchHandle) !void {
+        var event = linux.epoll_event{
+            .events = linux.EPOLL.IN,
+            .data = .{ .fd = @intCast(fd) },
+        };
+        const result = linux.epoll_ctl(@intCast(self.epfd), linux.EPOLL.CTL_ADD, @intCast(fd), &event);
+        if (result < 0) return errnoToFsEventError(result);
+    }
+
+    pub fn wait(self: *const Self, events: []linux.epoll_event, timeout_ms: i32) !usize {
+        const result = linux.epoll_wait(@intCast(self.epfd), events.ptr, @intCast(events.len), timeout_ms);
+        if (result < 0) return errnoToFsEventError(result);
+        return result;
+    }
+
+    pub fn deinit(self: *Self) void {
+        _ = linux.close(@intCast(self.epfd));
     }
 };
