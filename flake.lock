@@ -236,11 +236,11 @@
         "zls": "zls"
       },
       "locked": {
-        "lastModified": 1756517097,
-        "narHash": "sha256-StZm4ge7LcV3Ww5sP3pPKXqoem79zKAEt2vdhBJOKeA=",
+        "lastModified": 1760076974,
+        "narHash": "sha256-8J3gf+cP5+dUxaRFfnCaWfBHBz988nYeftAwGsQ/exs=",
         "owner": "penuvil",
         "repo": "zig-common",
-        "rev": "21f291e12334f4dbd6cb933e476816e6e9fec927",
+        "rev": "339319a6e115be11c34ebbe4e72056c4f5717c6c",
         "type": "github"
       },
       "original": {
