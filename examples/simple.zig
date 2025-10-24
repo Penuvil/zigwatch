@@ -15,10 +15,10 @@ pub fn main() !void {
     const wd = try watcher.add_watch(target, .{ .create = true, .delete = true });
     std.log.info("Watch added: {}", .{wd});
     // TODO: Expand example as API matures
-    var dir = try std.fs.Dir.openDir(std.fs.cwd(), target.path(), .{});
+    var dir = try std.fs.cwd().openDir(target.path(), .{});
     const fd = try dir.createFile("test.txt", .{});
     _ = try dir.deleteFile("test.txt");
-    defer _ = std.fs.File.close(fd);
+    defer fd.close();
     defer dir.close();
     _ = try watcher.poll();
 }

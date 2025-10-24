@@ -73,7 +73,9 @@ pub const LinuxWatcher = struct {
     }
 
     pub fn add_watch(self: *const Self, target: WatchPath, filter: EventFilter) !WatchHandle {
-        const wd = linux.inotify_add_watch(@intCast(self.wfd), target.cstr(), eventFilterToBits(filter));
+        const mask = eventFilterToBits(filter);
+        if (mask == 0) return FsEventError.InvalidArguments;
+        const wd = linux.inotify_add_watch(@intCast(self.wfd), target.cstr(), mask);
         if (wd < 0) {
             return errnoToFsEventError(std.posix.errno(wd));
         }
