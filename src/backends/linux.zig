@@ -10,15 +10,29 @@ const WatchPath = @import("../Watcher.zig").WatchPath;
 
 const FsEventError = @import("../Error.zig").FsEventError;
 
-pub const mapInotifyEvent = [_]struct { mask: u32, event: EventType }{
+const mapInotifyEvent = [_]struct { mask: u32, event: EventType }{
     .{ .mask = IN.CREATE, .event = .Create },
     .{ .mask = IN.MODIFY, .event = .Modify },
     .{ .mask = IN.DELETE, .event = .Delete },
 };
 
+fn eventFilterToBits(filter: EventFilter) u32 {
+    var mask: u32 = 0;
+    inline for (mapInotifyEvent) |map| {
+        const include = switch (map.event) {
+            .Create => filter.create,
+            .Modify => filter.modify,
+            .Delete => filter.delete,
+        };
+        if (include) mask |= map.mask;
+    }
+    std.log.debug("{}", .{mask});
+    return mask;
+}
+
 fn inotifyEventToEvent(mask: u32) !EventType {
     inline for (mapInotifyEvent) |entry| {
-        if (mask == entry.mask) return entry.event;
+        if ((mask & entry.mask) != 0) return entry.event;
     }
     return FsEventError.Unexpected;
 }
@@ -47,20 +61,20 @@ pub const LinuxWatcher = struct {
 
     pub fn init() !Self {
         const fd = linux.inotify_init1(IN.NONBLOCK | IN.CLOEXEC);
-        if (fd == -1) {
+        if (fd < 0) {
             return errnoToFsEventError(std.posix.errno(fd));
         }
         const poller = try LinuxPoller.init();
-        _ = try poller.add(@intCast(fd));
+        try poller.add(@intCast(fd));
         return Self{
             .wfd = @intCast(fd),
             .poller = poller,
         };
     }
 
-    pub fn add_watch(self: *const Self, target: WatchPath, mask: EventFilter) !WatchHandle {
-        const wd = linux.inotify_add_watch(@intCast(self.wfd), target.cstr(), mask.toBits());
-        if (wd == -1) {
+    pub fn add_watch(self: *const Self, target: WatchPath, filter: EventFilter) !WatchHandle {
+        const wd = linux.inotify_add_watch(@intCast(self.wfd), target.cstr(), eventFilterToBits(filter));
+        if (wd < 0) {
             return errnoToFsEventError(std.posix.errno(wd));
         }
         return @intCast(wd);
@@ -74,9 +88,13 @@ pub const LinuxWatcher = struct {
             if (event.data.fd == self.wfd) {
                 var offset: usize = 0;
                 var evbuf: [4096]u8 = undefined;
-                const size = linux.read(@intCast(self.wfd), &evbuf, evbuf.len);
+                const bytes_read = linux.read(@intCast(self.wfd), &evbuf, evbuf.len);
+                if (bytes_read < 0) return errnoToFsEventError(std.posix.errno(bytes_read));
+                const size: usize = @intCast(bytes_read);
                 while (offset < size) {
                     const e: *align(1) linux.inotify_event = @ptrCast(&evbuf[offset]);
+                    const event_length = @sizeOf(linux.inotify_event) + e.len;
+                    if (offset + event_length > size) break;
                     const result: Event = .{
                         .handle = e.wd,
                         .type = try inotifyEventToEvent(e.mask),
@@ -85,7 +103,7 @@ pub const LinuxWatcher = struct {
                         .extra = null,
                     };
                     std.log.debug("{any}", .{result});
-                    offset += @sizeOf(linux.inotify_event) + e.len;
+                    offset += event_length;
                 }
             }
         }
@@ -104,7 +122,7 @@ pub const LinuxPoller = struct {
 
     pub fn init() !Self {
         const fd = linux.epoll_create1(linux.EPOLL.CLOEXEC);
-        if (fd < 0) return errnoToFsEventError(fd);
+        if (fd < 0) return errnoToFsEventError(std.posix.errno(fd));
         return Self{ .epfd = fd };
     }
 
@@ -113,14 +131,14 @@ pub const LinuxPoller = struct {
             .events = linux.EPOLL.IN,
             .data = .{ .fd = @intCast(fd) },
         };
-        const result = linux.epoll_ctl(@intCast(self.epfd), linux.EPOLL.CTL_ADD, @intCast(fd), &event);
-        if (result < 0) return errnoToFsEventError(result);
+        const rc = linux.epoll_ctl(@intCast(self.epfd), linux.EPOLL.CTL_ADD, @intCast(fd), &event);
+        if (rc < 0) return errnoToFsEventError(std.posix.errno(rc));
     }
 
     pub fn wait(self: *const Self, events: []linux.epoll_event, timeout_ms: i32) !usize {
-        const result = linux.epoll_wait(@intCast(self.epfd), events.ptr, @intCast(events.len), timeout_ms);
-        if (result < 0) return errnoToFsEventError(result);
-        return result;
+        const rc = linux.epoll_wait(@intCast(self.epfd), events.ptr, @intCast(events.len), timeout_ms);
+        if (rc < 0) return errnoToFsEventError(std.posix.errno(rc));
+        return rc;
     }
 
     pub fn deinit(self: *Self) void {

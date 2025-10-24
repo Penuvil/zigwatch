@@ -13,7 +13,6 @@ pub fn main() !void {
     var target = try zw.WatchPath.init(".", allocator);
     defer _ = target.deinit(allocator);
     const wd = try watcher.add_watch(target, .{ .create = true, .delete = true });
-    std.posix.close(@intCast(wd));
     std.log.info("Watch added: {}", .{wd});
     // TODO: Expand example as API matures
     var dir = try std.fs.Dir.openDir(std.fs.cwd(), target.path(), .{});

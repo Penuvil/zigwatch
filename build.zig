@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .cwd_relative = "examples/simple.zig" },
         .target = target,
         .optimize = optimize,
+        .link_libc = false,
     }) });
 
     example.linkLibrary(lib);
