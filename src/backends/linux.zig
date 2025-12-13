@@ -75,7 +75,18 @@ pub const LinuxWatcher = struct {
     pub fn add_watch(self: *const Self, target: WatchPath, filter: EventFilter) !WatchHandle {
         const mask = eventFilterToBits(filter);
         if (mask == 0) return FsEventError.InvalidArguments;
-        const wd = linux.inotify_add_watch(@intCast(self.wfd), target.cstr(), mask);
+
+        const target_path = switch (target) {
+            .path => |p| p,
+            .fd => return FsEventError.InvalidArguments,
+        };
+
+        var cstr_target_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+        @memcpy(cstr_target_buf[0..target_path.len], target_path);
+        cstr_target_buf[target_path.len] = 0;
+        const cstr_target: [*:0]const u8 = @ptrCast(&cstr_target_buf[0]);
+
+        const wd = linux.inotify_add_watch(@intCast(self.wfd), cstr_target, mask);
         if (wd < 0) {
             return errnoToFsEventError(std.posix.errno(wd));
         }
