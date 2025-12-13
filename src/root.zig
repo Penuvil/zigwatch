@@ -1,8 +1,8 @@
 const std = @import("std");
 
 pub const Watcher = @import("Watcher.zig").Watcher;
-pub const WatchPath = @import("Watcher.zig").WatchPath;
 pub const Event = @import("Event.zig").Event;
+pub const EventIterator = @import("Event.zig").EventIterator;
 pub const EventFilter = @import("Event.zig").EventFilter;
 
 pub const EventMaskCreate = @import("Event.zig").EventMaskCreate;
