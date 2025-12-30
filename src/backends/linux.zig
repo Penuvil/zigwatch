@@ -105,7 +105,9 @@ pub const LinuxWatcher = struct {
         if (wd < 0) {
             return errnoToFsEventError(std.posix.errno(wd));
         }
-        try self.watches.put(@intCast(wd), try self.allocator.dupe(u8, target));
+        const duped_target = try self.allocator.dupe(u8, target);
+        errdefer self.allocator.free(duped_target);
+        try self.watches.put(@intCast(wd), duped_target);
         return @intCast(wd);
     }
 
