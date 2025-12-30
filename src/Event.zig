@@ -1,6 +1,3 @@
-const std = @import("std");
-const builtin = @import("builtin");
-
 const WatchHandle = @import("Watcher.zig").WatchHandle;
 
 pub const EventType = enum {
