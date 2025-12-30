@@ -30,9 +30,8 @@ fn eventFilterToBits(filter: EventFilter) u32 {
 }
 
 fn inotifyEventToEvent(mask: u32) !EventType {
-    const event_mask = mask & (IN.CREATE | IN.MODIFY | IN.DELETE);
     inline for (mapInotifyEvent) |entry| {
-        if (event_mask == entry.mask) return entry.event;
+        if (mask & entry.mask != 0) return entry.event;
     }
     return FsEventError.Unexpected;
 }
