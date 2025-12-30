@@ -156,7 +156,7 @@ pub const LinuxWatcher = struct {
                             break :blk try std.fs.path.join(allocator, &.{ base_path, name_ptr });
                         } else base_path;
 
-                        try self.event_queue.append(allocator, .{
+                        try self.event_queue.append(self.allocator, .{
                             .handle = e.wd,
                             .type = try inotifyEventToEvent(e.mask),
                             .path = full_path,
@@ -185,7 +185,7 @@ pub const LinuxWatcher = struct {
         while (iter.next()) |v| {
             self.allocator.free(v.*);
         }
-        self.event_queue.deinit(self.arena.allocator());
+        self.event_queue.deinit(self.allocator);
         self.watches.deinit();
         self.arena.deinit();
         self.poller.deinit();
